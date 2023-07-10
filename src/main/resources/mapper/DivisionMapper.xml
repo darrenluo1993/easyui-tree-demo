@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.demo.mapper.DivisionMapper">
+    <resultMap id="TreeData" type="com.example.demo.model.TreeData">
+        <result column="ID" property="id" jdbcType="VARCHAR"/>
+        <result column="NAME" property="text" jdbcType="VARCHAR"/>
+        <result column="STATE" property="state" jdbcType="VARCHAR"/>
+        <result column="SUP_ID" property="parentId" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="listRootNode" resultMap="TreeData">
+        select
+            DVS.ID,
+            DVS.NAME,
+            DVS.SUP_ID,
+            case
+                when (select count(ID) from DIVISION where SUP_ID = DVS.ID) > 0 then
+                    'closed'
+                else
+                    'open'
+            end STATE
+        from
+            DIVISION DVS
+        where
+            DVS.SUP_ID = 0
+        order by
+            DVS.ID
+    </select>
+
+    <select id="listSubNodeBySupNodeId" resultMap="TreeData">
+        select
+            DVS.ID,
+            DVS.NAME,
+            DVS.SUP_ID,
+            case
+                when (select count(ID) from DIVISION where SUP_ID = DVS.ID) > 0 then
+                    'closed'
+                else
+                    'open'
+            end STATE
+        from
+            DIVISION DVS
+        where
+            DVS.SUP_ID = #{supNodeId,jdbcType=VARCHAR}
+        order by
+            DVS.ID
+    </select>
+
+    <select id="listCheckedNodeSupNodeId" resultType="java.lang.String">
+        select
+            ID
+        from
+           (select
+                distinct
+                DVS.ID,
+                DVS.DEPTH
+            from
+                DIVISION DVS
+            start with
+                DVS.ID in(select
+                              distinct SUP_ID
+                          from
+                              DIVISION
+                          where
+                              ID in(select distinct DIVISION_ID from CHECKED))
+            connect by prior
+                 DVS.SUP_ID = DVS.ID
+                 and DVS.DEPTH &lt;= (select
+                                          MAX(DEPTH)
+                                      from
+                                          DIVISION
+                                      where
+                                          ID in(select distinct DIVISION_ID from CHECKED))
+             order by DVS.DEPTH)
+    </select>
+
+    <select id="listCheckedNodeId" resultType="java.lang.String">
+        select distinct DIVISION_ID from CHECKED
+    </select>
+
+    <delete id="removeCheckedNodes">
+        delete from CHECKED
+    </delete>
+
+    <insert id="saveCheckedNodes">
+        insert into CHECKED
+           (DIVISION_ID)
+        <foreach collection="checkedNodeIds" item="checkedNodeId" open="(" close=")" separator="union all">
+            select
+                #{checkedNodeId,jdbcType=VARCHAR}
+            from DUAL
+        </foreach>
+    </insert>
+</mapper>

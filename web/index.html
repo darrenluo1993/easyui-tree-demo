@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="js/easyui/themes/icon.css"/>
+    <link rel="stylesheet" href="js/easyui/themes/metro/easyui.css"/>
+    <script type="text/javascript" src="js/jquery/jquery.min.js"></script>
+    <script type="text/javascript" src="js/easyui/jquery.easyui.min.js"></script>
+    <script type="text/javascript" src="js/easyui/jquery.easyui.extends.js"></script>
+    <script type="text/javascript" src="js/easyui/locale/easyui-lang-zh_CN.js"></script>
+    <script type="text/javascript">
+        $(function() {
+            // 保存
+            $("a.link.save").click(function() {
+                var checkedNodeIdArr = [];
+                var nodes = $("#divsionTree").tree("getChecked");
+                $(nodes).each(function(i, node){
+                    var parentNode = $("#divsionTree").tree("getParent", node.target);
+                    // 如果父节点不为空
+                    if(parentNode){
+                        // 如果父节点是未选中状态，则当前节点是分支树中选中的顶级节点，进行记录
+                        // 如果父节点是已选中状态，则当前节点非分支树中选中的顶级节点，不进行记录
+                        if(!parentNode.checked){
+                            checkedNodeIdArr.push(node.id);
+                        }
+                        // 如果没有父节点，则记录当前节点
+                    } else {
+                        checkedNodeIdArr.push(node.id);
+                    }
+                });
+
+                var checkedNodeIds = JSON.stringify(checkedNodeIdArr);
+                $.post("http://localhost:8888/division/saveCheckedNodes", {checkedNodeIds: checkedNodeIds}, function(result) {
+                    alert(result);
+                }, "text");
+            });
+
+            // 查询已勾选并已保存节点的所有上级节点ID
+            var checkedNodeSupNodeIdArr = [];
+            $.ajax({
+                url: "http://localhost:8888/division/listCheckedNodeSupNodeId",
+                data: {},
+                async: false,
+                type: "post",
+                dataType: "json",
+                success: function(result){
+                    if(result){
+                        checkedNodeSupNodeIdArr = result;
+                    }
+                }
+            });
+            // 查询已勾选并已保存的节点ID
+            var checkedNodeIdArr = [];
+            $.ajax({
+                url: "http://localhost:8888/division/listCheckedNodeId",
+                data: {},
+                async: false,
+                type: "post",
+                dataType: "json",
+                success: function(result){
+                    if(result){
+                        checkedNodeIdArr = result;
+                    }
+                }
+            });
+
+            $("#divsionTree").tree({
+                url: "http://localhost:8888/division/listRootNode",
+                checkbox: true,
+                onClick: function(node){
+                    $("#divsionTree").tree(node.checked ? "uncheck" : "check", node.target);
+                },
+                onBeforeExpand: function(node){
+                    $("#divsionTree").tree("options").url = "http://localhost:8888/division/listSubNodeBySupNodeId?supNodeId=" + node.id;
+                },
+                onLoadSuccess: function(node, nodeData){
+                    // 展开已勾选并已保存节点的所有上级节点
+                    $(checkedNodeSupNodeIdArr).each(function(i, checkedNodeSupNodeId){
+                        var node = $("#divsionTree").tree("find", checkedNodeSupNodeId);
+                        if(node){
+                            $("#divsionTree").tree("expand", node.target);
+                            checkedNodeSupNodeIdArr.splice($.inArray(checkedNodeSupNodeId, checkedNodeSupNodeIdArr), 1);
+                        }
+                    });
+                    // 勾选已勾选并已保存的节点
+                    $(checkedNodeIdArr).each(function(i, checkedNodeId){
+                        var node = $("#divsionTree").tree("find", checkedNodeId);
+                        if(node){
+                            $("#divsionTree").tree("check", node.target);
+                            checkedNodeIdArr.splice($.inArray(checkedNodeId, checkedNodeIdArr), 1);
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+<div class="center">
+    <div class="panel">
+        <div class="panel-body">
+            <ul id="divsionTree"></ul>
+        </div>
+        <div class="panel-top">
+            <div class="panel-toolbar">
+                <div class="toolBar">
+                    <div class="group"><a class="link save">保存</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
